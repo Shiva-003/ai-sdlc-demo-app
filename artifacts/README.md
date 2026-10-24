@@ -1,0 +1,1 @@
+Store short, actual mutation score summaries and any necessary sanitized command output here. Do not commit the full Stryker report unless the assignment reviewer asks for it; do not enter placeholder or guessed scores.
