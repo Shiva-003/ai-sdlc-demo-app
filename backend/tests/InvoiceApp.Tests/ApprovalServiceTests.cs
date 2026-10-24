@@ -13,7 +13,8 @@ public class ApprovalServiceTests
         DateTime CreatedAt,
         string? DecidedBy,
         DateTime? DecidedAt,
-        string? DecisionNote);
+        string? DecisionNote,
+        IReadOnlyList<ApprovalEntry> ApprovalHistory);
 
     private static InvoiceSnapshot CaptureSnapshot(Invoice invoice) =>
         new(
@@ -24,13 +25,22 @@ public class ApprovalServiceTests
             invoice.CreatedAt,
             invoice.DecidedBy,
             invoice.DecidedAt,
-            invoice.DecisionNote);
+            invoice.DecisionNote,
+            invoice.ApprovalHistory.ToList());
 
     private static void AssertUnchanged(InvoiceSnapshot before, Invoice invoice, int beforeUpdateCount, int afterUpdateCount)
     {
         var after = CaptureSnapshot(invoice);
 
-        Assert.Equal(before, after);
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(before.CustomerName, after.CustomerName);
+        Assert.Equal(before.Amount, after.Amount);
+        Assert.Equal(before.Status, after.Status);
+        Assert.Equal(before.CreatedAt, after.CreatedAt);
+        Assert.Equal(before.DecidedBy, after.DecidedBy);
+        Assert.Equal(before.DecidedAt, after.DecidedAt);
+        Assert.Equal(before.DecisionNote, after.DecisionNote);
+        Assert.Equal(before.ApprovalHistory, after.ApprovalHistory);
         Assert.Equal(beforeUpdateCount, afterUpdateCount);
     }
 
@@ -134,20 +144,6 @@ public class ApprovalServiceTests
     }
 
     [Fact]
-    public void Approve_Director_RejectsAmountJustOverLimit()
-    {
-        var invoice = InvoiceWith("INV-1", InvoiceStatus.PendingApproval, 500000.01m);
-        var (service, repository) = ServiceWithTracking(invoice);
-        var before = CaptureSnapshot(invoice);
-
-        var ex = Assert.Throws<ArgumentException>(() => service.Approve("INV-1", "demo.director", "Director"));
-
-        Assert.Contains("Director", ex.Message);
-        Assert.Contains("500000", ex.Message);
-        AssertUnchanged(before, repository.GetById("INV-1")!, 0, repository.UpdateCallCount);
-    }
-
-    [Fact]
     public void Approve_RejectsDisallowedRole()
     {
         var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.PendingApproval, 25000m));
@@ -195,6 +191,102 @@ public class ApprovalServiceTests
 
         Assert.Equal(InvoiceStatus.Rejected, result.Status);
         Assert.Equal("Duplicate invoice", result.DecisionNote);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_UsesTwoStageApprovalFlow()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var service = ServiceFor(invoice);
+
+        var firstStage = service.Approve("INV-2", "demo.manager", "Manager");
+        var firstStageSnapshot = CaptureSnapshot(firstStage);
+        var firstHistoryEntry = Assert.Single(firstStageSnapshot.ApprovalHistory);
+
+        Assert.Equal(InvoiceStatus.PendingApproval, firstStageSnapshot.Status);
+        Assert.Equal("demo.manager", firstHistoryEntry.Username);
+        Assert.Equal("Manager", firstHistoryEntry.Role);
+        Assert.False(firstHistoryEntry.IsFinal);
+        Assert.NotEqual(default, firstHistoryEntry.RecordedAt);
+
+        var finalStage = service.Approve("INV-2", "demo.director", "Director");
+        var secondHistoryEntry = finalStage.ApprovalHistory[1];
+
+        Assert.Equal(InvoiceStatus.Approved, finalStage.Status);
+        Assert.Equal("demo.director", finalStage.DecidedBy);
+        Assert.Equal("demo.director", secondHistoryEntry.Username);
+        Assert.Equal("Director", secondHistoryEntry.Role);
+        Assert.True(secondHistoryEntry.IsFinal);
+        Assert.NotEqual(default, secondHistoryEntry.RecordedAt);
+        Assert.Equal(2, finalStage.ApprovalHistory.Count);
+        Assert.False(finalStage.ApprovalHistory[0].IsFinal);
+        Assert.Equal(firstStageSnapshot.ApprovalHistory[0].Username, finalStage.ApprovalHistory[0].Username);
+        Assert.Equal(firstStageSnapshot.ApprovalHistory[0].Role, finalStage.ApprovalHistory[0].Role);
+        Assert.Equal(firstStageSnapshot.ApprovalHistory[0].RecordedAt, finalStage.ApprovalHistory[0].RecordedAt);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_RejectsRepeatedUsernameOnSecondStage()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        service.Approve("INV-2", "demo.manager", "Manager");
+        var before = CaptureSnapshot(invoice);
+        var beforeUpdateCount = repository.UpdateCallCount;
+
+        var ex = Assert.Throws<ArgumentException>(() => service.Approve("INV-2", "demo.manager", "Director"));
+
+        Assert.Contains("distinct", ex.Message, StringComparison.OrdinalIgnoreCase);
+        AssertUnchanged(before, repository.GetById("INV-2")!, beforeUpdateCount, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_RejectsNonDirectorSecondApprover()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        service.Approve("INV-2", "demo.director", "Director");
+        var before = CaptureSnapshot(invoice);
+        var beforeUpdateCount = repository.UpdateCallCount;
+
+        var ex = Assert.Throws<ArgumentException>(() => service.Approve("INV-2", "demo.manager", "Manager"));
+
+        Assert.Contains("Director", ex.Message);
+        AssertUnchanged(before, repository.GetById("INV-2")!, beforeUpdateCount, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_RejectsRepeatedUsernameWithoutMutation()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        service.Approve("INV-2", "demo.manager", "Manager");
+        var before = CaptureSnapshot(invoice);
+        var beforeUpdateCount = repository.UpdateCallCount;
+
+        var ex = Assert.Throws<ArgumentException>(() => service.Approve("INV-2", "demo.manager", "Director"));
+
+        Assert.Contains("distinct", ex.Message, StringComparison.OrdinalIgnoreCase);
+        AssertUnchanged(before, repository.GetById("INV-2")!, beforeUpdateCount, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_RejectsNonDirectorSecondApproverWithoutMutation()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        service.Approve("INV-2", "demo.director", "Director");
+        var before = CaptureSnapshot(invoice);
+        var beforeUpdateCount = repository.UpdateCallCount;
+
+        var ex = Assert.Throws<ArgumentException>(() => service.Approve("INV-2", "demo.manager", "Manager"));
+
+        Assert.Contains("Director", ex.Message);
+        AssertUnchanged(before, repository.GetById("INV-2")!, beforeUpdateCount, repository.UpdateCallCount);
     }
 
     [Fact]

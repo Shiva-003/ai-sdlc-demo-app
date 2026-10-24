@@ -32,11 +32,25 @@ public class ApprovalService
     {
         var invoice = Find(invoiceId);
         EnsurePending(invoice);
+
+        if (invoice.Amount > 500000m)
+        {
+            return ApproveHighValue(invoice, approver, role);
+        }
+
         EnsureRoleAndLimit(invoice, role);
 
+        var approvedAt = DateTime.UtcNow;
         invoice.Status = InvoiceStatus.Approved;
         invoice.DecidedBy = approver;
-        invoice.DecidedAt = DateTime.UtcNow;
+        invoice.DecidedAt = approvedAt;
+        invoice.ApprovalHistory.Add(new ApprovalEntry
+        {
+            Username = approver,
+            Role = role,
+            IsFinal = true,
+            RecordedAt = approvedAt
+        });
         _repository.Update(invoice);
         return invoice;
     }
@@ -102,5 +116,60 @@ public class ApprovalService
         }
 
         throw new ArgumentException("Only Manager and Director roles may approve invoices.", nameof(role));
+    }
+
+    private Invoice ApproveHighValue(Invoice invoice, string approver, string role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            throw new ArgumentException("Approval role is required.", nameof(role));
+        }
+
+        if (role != "Manager" && role != "Director")
+        {
+            throw new ArgumentException("Only Manager and Director roles may approve invoices.", nameof(role));
+        }
+
+        var existingApproval = invoice.ApprovalHistory.LastOrDefault();
+
+        if (existingApproval is null)
+        {
+            var recordedAt = DateTime.UtcNow;
+            invoice.ApprovalHistory.Add(new ApprovalEntry
+            {
+                Username = approver,
+                Role = role,
+                IsFinal = false,
+                RecordedAt = recordedAt
+            });
+            _repository.Update(invoice);
+            return invoice;
+        }
+
+        if (string.Equals(existingApproval.Username, approver, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "High-value invoice approvals require distinct approver usernames for each approval stage.", nameof(approver));
+        }
+
+        if (!string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "For invoices above 500000, the second approver must be a Director.", nameof(role));
+        }
+
+        var finalAt = DateTime.UtcNow;
+        invoice.Status = InvoiceStatus.Approved;
+        invoice.DecidedBy = approver;
+        invoice.DecidedAt = finalAt;
+        invoice.ApprovalHistory.Add(new ApprovalEntry
+        {
+            Username = approver,
+            Role = role,
+            IsFinal = true,
+            RecordedAt = finalAt
+        });
+        _repository.Update(invoice);
+        return invoice;
     }
 }
