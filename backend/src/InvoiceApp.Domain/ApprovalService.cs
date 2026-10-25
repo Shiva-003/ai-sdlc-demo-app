@@ -33,12 +33,14 @@ public class ApprovalService
         var invoice = Find(invoiceId);
         EnsurePending(invoice);
 
+        var normalizedRole = NormalizeRole(role);
+
         if (invoice.Amount > 500000m)
         {
-            return ApproveHighValue(invoice, approver, role);
+            return ApproveHighValue(invoice, approver, normalizedRole);
         }
 
-        EnsureRoleAndLimit(invoice, role);
+        EnsureRoleAndLimit(invoice, normalizedRole);
 
         var approvedAt = DateTime.UtcNow;
         invoice.Status = InvoiceStatus.Approved;
@@ -47,7 +49,7 @@ public class ApprovalService
         invoice.ApprovalHistory.Add(new ApprovalEntry
         {
             Username = approver,
-            Role = role,
+            Role = normalizedRole,
             IsFinal = true,
             RecordedAt = approvedAt
         });
@@ -86,14 +88,33 @@ public class ApprovalService
         }
     }
 
-    private static void EnsureRoleAndLimit(Invoice invoice, string role)
+    private static string NormalizeRole(string role)
     {
         if (string.IsNullOrWhiteSpace(role))
         {
             throw new ArgumentException("Approval role is required.", nameof(role));
         }
 
-        if (role == "Manager")
+        var trimmed = role.Trim();
+
+        if (string.Equals(trimmed, "Manager", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Manager";
+        }
+
+        if (string.Equals(trimmed, "Director", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Director";
+        }
+
+        return trimmed;
+    }
+
+    private static void EnsureRoleAndLimit(Invoice invoice, string role)
+    {
+        var normalizedRole = NormalizeRole(role);
+
+        if (string.Equals(normalizedRole, "Manager", StringComparison.OrdinalIgnoreCase))
         {
             if (invoice.Amount > 50000m)
             {
@@ -104,7 +125,7 @@ public class ApprovalService
             return;
         }
 
-        if (role == "Director")
+        if (string.Equals(normalizedRole, "Director", StringComparison.OrdinalIgnoreCase))
         {
             if (invoice.Amount > 500000m)
             {
@@ -120,12 +141,10 @@ public class ApprovalService
 
     private Invoice ApproveHighValue(Invoice invoice, string approver, string role)
     {
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            throw new ArgumentException("Approval role is required.", nameof(role));
-        }
+        var normalizedRole = NormalizeRole(role);
 
-        if (role != "Manager" && role != "Director")
+        if (!string.Equals(normalizedRole, "Manager", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(normalizedRole, "Director", StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("Only Manager and Director roles may approve invoices.", nameof(role));
         }
@@ -138,7 +157,7 @@ public class ApprovalService
             invoice.ApprovalHistory.Add(new ApprovalEntry
             {
                 Username = approver,
-                Role = role,
+                Role = normalizedRole,
                 IsFinal = false,
                 RecordedAt = recordedAt
             });
@@ -152,7 +171,7 @@ public class ApprovalService
                 "High-value invoice approvals require distinct approver usernames for each approval stage.", nameof(approver));
         }
 
-        if (!string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(normalizedRole, "Director", StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException(
                 "For invoices above 500000, the second approver must be a Director.", nameof(role));
@@ -165,7 +184,7 @@ public class ApprovalService
         invoice.ApprovalHistory.Add(new ApprovalEntry
         {
             Username = approver,
-            Role = role,
+            Role = normalizedRole,
             IsFinal = true,
             RecordedAt = finalAt
         });

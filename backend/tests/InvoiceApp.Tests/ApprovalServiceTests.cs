@@ -130,6 +130,17 @@ public class ApprovalServiceTests
     }
 
     [Fact]
+    public void Approve_NormalizesRoleNameBeforeApplyingPolicy()
+    {
+        var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.PendingApproval, 25000m));
+
+        var result = service.Approve("INV-1", "demo.manager", "manager");
+
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal("Manager", result.ApprovalHistory.Single().Role);
+    }
+
+    [Fact]
     public void Approve_Manager_RejectsAmountJustOverLimit()
     {
         var invoice = InvoiceWith("INV-1", InvoiceStatus.PendingApproval, 50000.01m);
