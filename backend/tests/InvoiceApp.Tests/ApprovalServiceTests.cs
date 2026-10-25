@@ -226,6 +226,37 @@ public class ApprovalServiceTests
     }
 
     [Fact]
+    public void Approve_HighValueInvoice_PersistsFirstStageApproval()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        var result = service.Approve("INV-2", "demo.manager", "Manager");
+
+        Assert.Equal(1, repository.UpdateCallCount);
+        Assert.Equal(InvoiceStatus.PendingApproval, result.Status);
+        Assert.Single(result.ApprovalHistory);
+        Assert.False(result.ApprovalHistory[0].IsFinal);
+    }
+
+    [Fact]
+    public void Approve_HighValueInvoice_PersistsFinalStageApproval()
+    {
+        var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
+        var (service, repository) = ServiceWithTracking(invoice);
+
+        service.Approve("INV-2", "demo.manager", "Manager");
+        var beforeUpdateCount = repository.UpdateCallCount;
+
+        var result = service.Approve("INV-2", "demo.director", "Director");
+
+        Assert.Equal(beforeUpdateCount + 1, repository.UpdateCallCount);
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal(2, result.ApprovalHistory.Count);
+        Assert.True(result.ApprovalHistory[1].IsFinal);
+    }
+
+    [Fact]
     public void Approve_HighValueInvoice_RejectsRepeatedUsernameOnSecondStage()
     {
         var invoice = InvoiceWith("INV-2", InvoiceStatus.PendingApproval, 600000m);
