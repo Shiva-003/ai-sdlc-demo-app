@@ -75,8 +75,7 @@ No confirmed security findings remain in this PR. The review rechecked the imple
 
 ## Demo video
 
-- Video URL: not available in this repo checkout or recorded artifact set.
-- Duration: not verified.
+- The video is attached in the zip file submission in one drive.
 
 ## Lessons learned
 
