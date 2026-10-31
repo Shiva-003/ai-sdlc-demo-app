@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "userPromptSubmitted": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "postToolUse": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "postToolUseFailure": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "subagentStart": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "subagentStop": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "agentStop": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ],
+    "sessionEnd": [
+      { "type": "command", "command": "node .github/hooks/log-ai-event.cjs", "timeoutSec": 10 }
+    ]
+  }
+}

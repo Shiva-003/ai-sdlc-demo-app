@@ -1,0 +1,1 @@
+The Copilot hook should append real events to `ai-interactions.jsonl` when it runs. This directory intentionally contains no fabricated AI interactions. After using Copilot, verify that the log contains your real prompts/tool events and inspect any transcript snapshots for secrets before committing them.

@@ -5,7 +5,7 @@ A small invoice approval app used for live AI-in-SDLC demos. It is deliberately 
 ## Run it
 
 ```
-dotnet run --project backend/src/InvoiceApp.Api
+dotnet run --project backend/src/InvoiceApp.Api --launch-profile http
 ```
 
 Open http://localhost:5000 and sign in:
@@ -28,8 +28,17 @@ Invoices move through Draft, Pending Approval, then Approved or Rejected.
 ## Tests
 
 ```
-dotnet test backend/InvoiceApp.sln
+dotnet test
 ```
+
+## Mutation testing note
+
+I initially missed the baseline mutation run for this feature. Then later returned to the starting commit and reran the baseline there so the before/after comparison is accurate and auditable.
+
+- Baseline from the starting commit (`66cb3f9`): 30.77% mutation score, 12 killed, 10 survived, 0 timeout
+- Final feature-branch result: 58.00% mutation score, 58 killed, 17 survived, 0 timeout
+
+This note records the corrected historical baseline rather than the earlier missed attempt.
 
 ## Project layout
 

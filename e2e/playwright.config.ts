@@ -8,6 +8,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5000',
     trace: 'on-first-retry',
+    launchOptions : {
+      slowMo: 1500
+    }
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
