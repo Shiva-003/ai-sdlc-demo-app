@@ -47,10 +47,10 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a static HTML/CSS/JavaScr
 
 ## Commands
 
-- Run app: `dotnet run --project backend/src/InvoiceApp.Api`
-- Run unit tests: `dotnet test backend/InvoiceApp.sln`
+- Run app: `dotnet run --project backend/src/InvoiceApp.Api --launch-profile http`
+- Run unit tests: `dotnet test`
 - Build: `dotnet build backend/InvoiceApp.sln --configuration Release`
-- Run Playwright: `cd e2e && npm ci && npx playwright install chromium && npm test`
+- Run Playwright: `cd e2e && npm ci && node node_modules/@playwright/test/cli.js test tests/approval-limits.spec.ts --headed`
 - Run mutation tests from `backend/src/InvoiceApp.Domain`: `dotnet stryker --test-project ../../tests/InvoiceApp.Tests/InvoiceApp.Tests.csproj`
 - Validate OpenSpec: `openspec validate add-role-based-approval-limits --strict` (if the installed OpenSpec CLI version uses a different syntax, inspect `openspec validate --help` and use its documented equivalent).
 

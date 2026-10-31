@@ -5,7 +5,7 @@ A small invoice approval app used for live AI-in-SDLC demos. It is deliberately 
 ## Run it
 
 ```
-dotnet run --project backend/src/InvoiceApp.Api
+dotnet run --project backend/src/InvoiceApp.Api --launch-profile http
 ```
 
 Open http://localhost:5000 and sign in:
@@ -28,7 +28,7 @@ Invoices move through Draft, Pending Approval, then Approved or Rejected.
 ## Tests
 
 ```
-dotnet test backend/InvoiceApp.sln
+dotnet test
 ```
 
 ## Mutation testing note
